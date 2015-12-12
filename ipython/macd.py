@@ -16,11 +16,23 @@ import pandas as pd
 import pandas.io.data as web
 import matplotlib.pyplot as plt
 
-def macd(name,sdate='2015-01-01',edate='2015-12-31'):
-    
+def getClose(h5,sym):
+    for c in h5.keys():
+        for i in h5[c]['Close'].columns:
+            if sym == i:
+                return h5[c]['Close'][i]
+        
+    return None
+
+def fromYahoo(name,sdate='2015-01-01',edate='2015-12-31'):
     
     DT = web.DataReader(name, data_source='yahoo',
-                 start=sdate,end=edate)
+                 start=sdate,end=edate)    
+    return DT
+
+def macd(DT):
+    
+
     
     DT['Date'] = pd.to_datetime( DT.index)
     tempds = DT.sort('Date',ascending = True )
