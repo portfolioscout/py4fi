@@ -1,9 +1,4 @@
-def compTrade(dt):
-    d=0.001
-    dt['reg']=np.where(dt['dmacd']>d,1,0)
-    dt['reg']=np.where(dt['dmacd']<-d,-1,dt['reg'])
-    dt['strategy']=dt['reg'].shift(1)*dt['market']
-    return dt
+
 
 import warnings
 warnings.simplefilter('ignore')
@@ -16,13 +11,29 @@ import pandas as pd
 import pandas.io.data as web
 import matplotlib.pyplot as plt
 
+
+def compTrade(dt):
+    d=0.001
+    dt['reg']=np.where(dt['dmacd']>d,1,0)
+    dt['reg']=np.where(dt['dmacd']<-d,-1,dt['reg'])
+    dt['strategy']=dt['reg'].shift(1)*dt['market']
+    return dt
+    
+def getSymbols(h5):
+    l=[]
+    for c in h5.keys():
+        l.append(h5[c]['Close'].columns.values)
+        
+    return [item for items in l for item in items]  
+
 def getClose(h5,sym):
+    df = pd.DataFrame()
     for c in h5.keys():
         for i in h5[c]['Close'].columns:
             if sym == i:
-                return h5[c]['Close'][i]
+                df['Close']=h5[c]['Close'][i]
         
-    return None
+    return df
 
 def fromYahoo(name,sdate='2015-01-01',edate='2015-12-31'):
     
@@ -31,8 +42,6 @@ def fromYahoo(name,sdate='2015-01-01',edate='2015-12-31'):
     return DT
 
 def macd(DT):
-    
-
     
     DT['Date'] = pd.to_datetime( DT.index)
     tempds = DT.sort('Date',ascending = True )
@@ -52,14 +61,20 @@ def macd(DT):
 
 
 def plotMacd(DT):
-    fig, axs = plt.subplots(4,1,figsize=(42, 60))
     
-    DT['CloseN'].plot(ax=axs[0], grid=True)
-    DT['macd'].plot(ax=axs[1], grid=True)
-    DT['signal'].plot(ax=axs[1], grid=True)
-    DT['dmacd'].plot(ax=axs[2], grid=True)
-    DT['reg'].plot(ax=axs[2], grid=True)
-    DT[['market','strategy']].cumsum().apply(np.exp).plot(ax=axs[3], grid=True)
+
+    figsize=(20, 10)
+    fig, axs1 = plt.subplots(1,1,figsize=figsize)
+    fig, axs2 = plt.subplots(1,1,figsize=figsize)
+    fig, axs3 = plt.subplots(1,1,figsize=figsize)
+    fig, axs4 = plt.subplots(1,1,figsize=figsize)
+            
+    DT['CloseN'].plot(ax=axs1, grid=True)
+    DT['macd'].plot(ax=axs2, grid=True)
+    DT['signal'].plot(ax=axs2, grid=True)
+    DT['dmacd'].plot(ax=axs3, grid=True)
+    DT['reg'].plot(ax=axs3, grid=True)
+    DT[['market','strategy']].cumsum().apply(np.exp).plot(ax=axs4, grid=True)
     
 def doCumsum(dt):
     ntrades=0
@@ -79,6 +94,26 @@ def doCumsum(dt):
     strat=np.exp(dcumsum['strategy'][lpos])
     bhold=np.exp(dcumsum['market'][lpos])
 
-    print 'mean','rmse', 'win','ntrades','last','strategy','bhold'
-    print mean,rmse, win,ntrades,last,strat,bhold
-    return dcumsum
+    res={}
+    res['meanpct']=mean
+    res['rmsepct']=rmse
+    res['win']=win
+    res['strategy']=strat
+    res['buyhold']=bhold
+    res['ntrades']=ntrades
+    res['totwinpct']=last
+    return dcumsum,res
+    
+def doCumsumonSymbols(p):
+    filename,symbols,start,end=p    
+    h5 = pd.HDFStore(filename, 'r')           
+    fd=pd.DataFrame()
+    for sym in symbols:
+        dt0=getClose(h5,sym)[start:end]
+
+        dt = macd(dt0) 
+        dcs,res=doCumsum(dt)
+        res['sym']=sym
+        tfd=pd.DataFrame(res,index=[sym])
+        fd=fd.append(tfd)
+    return fd
