@@ -5,9 +5,7 @@ warnings.simplefilter('ignore')
 
 import numpy as np
 import pandas as pd
-
-
-
+import multiprocessing as mp
 import pandas.io.data as web
 import matplotlib.pyplot as plt
 
@@ -22,16 +20,16 @@ def compTrade(dt):
 def getSymbols(h5):
     l=[]
     for c in h5.keys():
-        l.append(h5[c]['Close'].columns.values)
+        l.append(h5[c]['Adj Close'].columns.values)
         
     return [item for items in l for item in items]  
 
 def getClose(h5,sym):
     df = pd.DataFrame()
     for c in h5.keys():
-        for i in h5[c]['Close'].columns:
+        for i in h5[c]['Adj Close'].columns:
             if sym == i:
-                df['Close']=h5[c]['Close'][i]
+                df['Adj Close']=h5[c]['Adj Close'][i]
         
     return df
 
@@ -46,10 +44,10 @@ def macd(DT):
     DT['Date'] = pd.to_datetime( DT.index)
     tempds = DT.sort('Date',ascending = True )
     firstDate = tempds['Date'][0]
-    DT['CloseN'] = DT['Close']/DT['Close'][firstDate]
+    DT['CloseN'] = DT['Adj Close']/DT['Adj Close'][firstDate]
     
-    cs = tempds['Close']
-    firstClose=tempds['Close'][firstDate]
+    cs = tempds['Adj Close']
+    firstClose=tempds['Adj Close'][firstDate]
     macd=pd.ewma(cs,span=12)-pd.ewma(cs,span=26)
     signal=pd.ewma(macd,span=9)
     
@@ -117,3 +115,21 @@ def doCumsumonSymbols(p):
         tfd=pd.DataFrame(res,index=[sym])
         fd=fd.append(tfd)
     return fd
+    
+def parallelCumsum(filename,syms,start,end,procs=1):
+    alists=[]
+    nsym=len(syms)
+    f=nsym/procs
+    if nsym%procs >0:
+        f=f+1
+    for i in range(0,procs):
+        alists.append((filename,syms[i*f:(i+1)*f],start,end))
+    #print alists
+    pool = mp.Pool(processes=procs)
+    res=pool.map(doCumsumonSymbols,alists)
+
+    df=pd.DataFrame()
+    for r in res:
+        df=df.append(r)
+    df=df.sort('totwinpct',ascending=False) 
+    return df    
